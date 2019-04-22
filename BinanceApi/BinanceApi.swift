@@ -13,6 +13,7 @@ import Alamofire
 public struct BinancePingRequest: BinanceRequest, Codable {
     public static let endpoint = "v1/ping"
     public static let method: HTTPMethod = .get
+    public static let weight: Int8 = 1
 
     public struct Response: Codable {}
 }
@@ -21,6 +22,7 @@ public struct BinancePingRequest: BinanceRequest, Codable {
 public struct BinanceTimeRequest: BinanceRequest {
     public static let endpoint = "v1/time"
     public static let method: HTTPMethod = .get
+    public static let weight: Int8 = 1
 
     public struct Response: Decodable {
         public let localTime = Date()
@@ -32,8 +34,21 @@ public struct BinanceTimeRequest: BinanceRequest {
     }
 }
 
-// MARK: Market Data endpoints
+/// Exchange info
+/// Current exchange trading rules and symbol information
+public struct BinanceExchangeInfoRequest: BinanceRequest {
+    public static let endpoint = "v1/exchangeInfo"
+    public static let method: HTTPMethod = .get
+    public static let weight: Int8 = 1
+    
+    public struct Response: Decodable {
+        // TODO
+    }
+}
 
+// TODO
+
+// MARK: Market Data endpoints
 public struct BinanceDepthRequest: BinanceRequest {
     public static let endpoint = "v1/depth"
     public static let method: HTTPMethod = .get
@@ -272,6 +287,7 @@ public struct BinanceAllBookTickersRequest: BinanceRequest, Codable {
 
 // MARK: Account endpoints
 
+// Done
 /// Send in a new order.
 public struct BinanceNewOrderRequest: BinanceSignedRequest, Codable {
     public static let endpoint = "v3/order"
@@ -279,60 +295,181 @@ public struct BinanceNewOrderRequest: BinanceSignedRequest, Codable {
 
     public let symbol: String
     public let side: BinanceOrderSide
-    public let type: BinanceOrderType
-    /// Should not be sent for a market order.
+    public let orderType: BinanceOrderType
     public let timeInForce: BinanceOrderTime?
     public let quantity: Decimal
-    /// Should not be sent for a market order.
     public let price: Decimal?
-    /// A unique id for the order. Automatically generated if not sent.
     public let newClientOrderId: String?
-    /// Used with stop orders.
-    public let stopPrice: Decimal?
-    /// Used with iceberg orders.
+    public var stopPrice: Decimal?
     public let icebergQuantity: Decimal?
     public let timestamp: Date
+    public let newOrderRespType: BinanceResponseType?
 
-    public init(symbol: String, side: BinanceOrderSide, type: BinanceOrderType, quantity: Decimal,
+    public init(symbol: String, side: BinanceOrderSide, orderType: BinanceOrderType, quantity: Decimal,
                 price: Decimal? = nil, timeInForce: BinanceOrderTime? = nil, newClientOrderId: String? = nil,
-                stopPrice: Decimal? = nil, icebergQuantity: Decimal? = nil, timestamp: Date = Date()) {
+                stopPrice: Decimal? = nil, icebergQuantity: Decimal? = nil, timestamp: Date = Date(), newOrderRespType: BinanceResponseType? = nil) {
         self.symbol = symbol
         self.side = side
-        self.type = type
+        self.orderType = orderType
         self.quantity = quantity
         self.newClientOrderId = newClientOrderId
         self.stopPrice = stopPrice
         self.icebergQuantity = icebergQuantity
         self.timestamp = timestamp
+        self.newOrderRespType = newOrderRespType
 
-        switch type {
+        switch orderType {
         case .limit:
             assert(timeInForce != nil, "timeInForce should not be nil for a limit order")
             self.timeInForce = timeInForce
             assert(price != nil, "price should not be nil for a limit order")
             self.price = price
+            
+            self.stopPrice = nil
             break
         case .market:
-            self.timeInForce = nil
+            
             self.price = nil
+            self.stopPrice = nil
+            self.timeInForce = nil
+            break
+        case .stopLoss:
+            assert(stopPrice != nil, "stopPrice should not be nil for a stopLoss order")
+            self.stopPrice = stopPrice
+            
+            self.price = nil
+            self.timeInForce = nil
+            break
+        case .stopLossLimit:
+            assert(timeInForce != nil, "timeInForce should not be nil for a stopLossLimit order")
+            self.timeInForce = timeInForce
+            assert(price != nil, "price should not be nil for a stopLossLimit order")
+            self.price = price
+            assert(stopPrice != nil, "stopPrice should not be nil for a stopLossLimit order")
+            self.stopPrice = stopPrice
+            break
+        case .takeProfit:
+            assert(stopPrice != nil, "stopPrice should not be nil for a takeProfit order")
+            self.stopPrice = stopPrice
+            
+            self.price = nil
+            self.timeInForce = nil
+            break
+        case .takeProfitLimit:
+            assert(timeInForce != nil, "timeInForce should not be nil for a takeProfitLimit order")
+            self.timeInForce = timeInForce
+            assert(price != nil, "price should not be nil for a takeProfitLimit order")
+            self.price = price
+            assert(stopPrice != nil, "stopPrice should not be nil for a takeProfitLimit order")
+            self.stopPrice = stopPrice
+            break
+        case .limitMaker:
+            assert(price != nil, "price should not be nil for a limitMaker order")
+            self.price = price
+            
+            self.stopPrice = nil
+            self.timeInForce = nil
             break
         }
     }
 
     enum CodingKeys: String, CodingKey {
-        case symbol, side, type, timeInForce, quantity, price, newClientOrderId, stopPrice
+        case symbol, side
+        case orderType = "type"
+        case timeInForce, quantity, price, newClientOrderId, stopPrice, newOrderRespType
         case icebergQuantity = "icebergQty"
         case timestamp
     }
-
-    public struct Response: Codable {
+    
+    public struct Response: Decodable {
+        public var ResponseType: BinanceResponseType
         public let symbol: String
         public let orderId: UInt64
         public let clientOrderId: String
         public let transactTime: Date
+        public let price: Decimal?
+        public let originalQuantity: Decimal?
+        public let executedQuantity: Decimal?
+        public let cummulativeQuoteQuantity: Decimal?
+        public let status: BinanceOrderStatus?
+        public let timeInForce: BinanceOrderTime?
+        public let orderType: BinanceOrderType?
+        public let side: BinanceOrderSide?
+        public let fills: [Element]?
+        
+        public struct Element: Decodable {
+            public let price: Decimal
+            public let quantity: Decimal
+            public let commission: Decimal
+            public let commissionAsset: String
+            
+            public init(from decoder: Decoder) throws {
+                var values = try decoder.unkeyedContainer()
+                self.price = try values.decode(Decimal.self)
+                self.quantity = try values.decode(Decimal.self)
+                self.commission = try values.decode(Decimal.self)
+                self.commissionAsset = try values.decode(String.self)
+            }
+            
+            enum CodingKeys: String, CodingKey {
+                case price
+                case quantity = "qty"
+                case commission, commissionAsset
+            }
+        }
+        
+        public init(from decoder: Decoder) throws {
+            let dict = try decoder.container(keyedBy: CodingKeys.self)
+            
+            self.symbol = try dict.decode(type(of: self.symbol), forKey: .symbol)
+            self.orderId = try dict.decode(type(of: self.orderId), forKey: .orderId)
+            self.clientOrderId = try dict.decode(type(of: self.clientOrderId), forKey: .clientOrderId)
+            self.transactTime = try dict.decode(type(of: self.transactTime), forKey: .transactTime)
+            self.ResponseType = .ack
+            if dict.contains(.price) {
+                self.price = try dict.decode(type(of: self.price), forKey: .price)
+                self.originalQuantity = try dict.decode(type(of: self.originalQuantity), forKey: .originalQuantity)
+                self.executedQuantity = try dict.decode(type(of: self.executedQuantity), forKey: .executedQuantity)
+                self.cummulativeQuoteQuantity = try dict.decode(type(of: self.cummulativeQuoteQuantity), forKey: .cummulativeQuoteQuantity)
+                self.status = try dict.decode(type(of: self.status), forKey: .status)
+                self.timeInForce = try dict.decode(type(of: self.timeInForce), forKey: .timeInForce)
+                self.orderType = try dict.decode(type(of: self.orderType), forKey: .orderType)
+                self.side = try dict.decode(type(of: self.side), forKey: .side)
+                self.ResponseType = .result
+                if dict.contains(.fills) {
+                    self.fills = try dict.decode(type(of: self.fills), forKey: .fills)
+                    self.ResponseType = .full
+                }else{
+                    self.fills = nil
+                }
+            }else{
+                self.price = nil
+                self.originalQuantity = nil
+                self.executedQuantity = nil
+                self.cummulativeQuoteQuantity = nil
+                self.status = nil
+                self.timeInForce = nil
+                self.orderType = nil
+                self.side = nil
+                self.fills = nil
+            }
+        }
+        
+        enum CodingKeys: String, CodingKey {
+            case symbol, orderId, clientOrderId, transactTime, price
+            case originalQuantity = "origQty"
+            case executedQuantity = "executedQty"
+            case cummulativeQuoteQuantity = "cummulativeQuoteQty"
+            case status, timeInForce
+            case orderType = "type"
+            case side, fills
+        }
     }
+    
+    
 }
 
+// Done
 /// Test new order creation.
 /// Creates and validates a new order but does not send it into the matching engine.
 public struct BinanceTestNewOrderRequest: BinanceSignedRequest, Codable {
@@ -341,48 +478,88 @@ public struct BinanceTestNewOrderRequest: BinanceSignedRequest, Codable {
 
     public let symbol: String
     public let side: BinanceOrderSide
-    public let type: BinanceOrderType
-    /// Should not be sent for a market order.
+    public let orderType: BinanceOrderType
     public let timeInForce: BinanceOrderTime?
     public let quantity: Decimal
-    /// Should not be sent for a market order.
     public let price: Decimal?
-    /// A unique id for the order. Automatically generated if not sent.
     public let newClientOrderId: String?
-    /// Used with stop orders.
-    public let stopPrice: Decimal?
-    /// Used with iceberg orders.
+    public var stopPrice: Decimal?
     public let icebergQuantity: Decimal?
     public let timestamp: Date
-
-    public init(symbol: String, side: BinanceOrderSide, type: BinanceOrderType, quantity: Decimal,
+    public let newOrderRespType: BinanceResponseType?
+    
+    public init(symbol: String, side: BinanceOrderSide, orderType: BinanceOrderType, quantity: Decimal,
                 price: Decimal? = nil, timeInForce: BinanceOrderTime? = nil, newClientOrderId: String? = nil,
-                stopPrice: Decimal? = nil, icebergQuantity: Decimal? = nil, timestamp: Date = Date()) {
+                stopPrice: Decimal? = nil, icebergQuantity: Decimal? = nil, timestamp: Date = Date(), newOrderRespType: BinanceResponseType? = nil) {
         self.symbol = symbol
         self.side = side
-        self.type = type
+        self.orderType = orderType
         self.quantity = quantity
         self.newClientOrderId = newClientOrderId
         self.stopPrice = stopPrice
         self.icebergQuantity = icebergQuantity
         self.timestamp = timestamp
-
-        switch type {
+        self.newOrderRespType = newOrderRespType
+        
+        switch orderType {
         case .limit:
             assert(timeInForce != nil, "timeInForce should not be nil for a limit order")
             self.timeInForce = timeInForce
             assert(price != nil, "price should not be nil for a limit order")
             self.price = price
+            
+            self.stopPrice = nil
             break
         case .market:
-            self.timeInForce = nil
+            
             self.price = nil
+            self.stopPrice = nil
+            self.timeInForce = nil
+            break
+        case .stopLoss:
+            assert(stopPrice != nil, "stopPrice should not be nil for a stopLoss order")
+            self.stopPrice = stopPrice
+            
+            self.price = nil
+            self.timeInForce = nil
+            break
+        case .stopLossLimit:
+            assert(timeInForce != nil, "timeInForce should not be nil for a stopLossLimit order")
+            self.timeInForce = timeInForce
+            assert(price != nil, "price should not be nil for a stopLossLimit order")
+            self.price = price
+            assert(stopPrice != nil, "stopPrice should not be nil for a stopLossLimit order")
+            self.stopPrice = stopPrice
+            break
+        case .takeProfit:
+            assert(stopPrice != nil, "stopPrice should not be nil for a takeProfit order")
+            self.stopPrice = stopPrice
+            
+            self.price = nil
+            self.timeInForce = nil
+            break
+        case .takeProfitLimit:
+            assert(timeInForce != nil, "timeInForce should not be nil for a takeProfitLimit order")
+            self.timeInForce = timeInForce
+            assert(price != nil, "price should not be nil for a takeProfitLimit order")
+            self.price = price
+            assert(stopPrice != nil, "stopPrice should not be nil for a takeProfitLimit order")
+            self.stopPrice = stopPrice
+            break
+        case .limitMaker:
+            assert(price != nil, "price should not be nil for a limitMaker order")
+            self.price = price
+            
+            self.stopPrice = nil
+            self.timeInForce = nil
             break
         }
     }
-
+    
     enum CodingKeys: String, CodingKey {
-        case symbol, side, type, timeInForce, quantity, price, newClientOrderId, stopPrice
+        case symbol, side
+        case orderType = "type"
+        case timeInForce, quantity, price, newClientOrderId, stopPrice, newOrderRespType
         case icebergQuantity = "icebergQty"
         case timestamp
     }

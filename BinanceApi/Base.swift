@@ -48,12 +48,26 @@ extension String {
     }
 }
 
+public enum BinanceSymbolStatus: String, Codable {
+    case preTrading = "PRE_TRADING"
+    case trading = "TRADING"
+    case postTrading = "POST_TRADING"
+    case endOfDay = "END_OF_DAY"
+    case halt = "HALT"
+    case auctionMatch = "AUCTION_MATCH"
+    case `break` = "BREAK"
+}
+
+public enum BinanceSymbolType: String, Codable {
+    case spot = "SPOT"
+}
+
 public enum BinanceOrderStatus: String, Codable {
     case new = "NEW"
     case partial = "PARTIALLY_FILLED"
     case filled = "FILLED"
-    case cancelled = "CANCELED" // Yes, this is correct.
-    case pendingCancel = "PENDING_CANCEL"
+    case cancelled = "CANCELED"
+    case pendingCancel = "PENDING_CANCEL" // Currently unused
     case rejected = "REJECTED"
     case expired = "EXPIRED"
 }
@@ -61,6 +75,11 @@ public enum BinanceOrderStatus: String, Codable {
 public enum BinanceOrderType: String, Codable {
     case limit = "LIMIT"
     case market = "MARKET"
+    case stopLoss = "STOP_LOSS"
+    case stopLossLimit = "STOP_LOSS_LIMIT"
+    case takeProfit = "TAKE_PROFIT"
+    case takeProfitLimit = "TAKE_PROFIT_LIMIT"
+    case limitMaker = "LIMIT_MAKER"
 }
 
 public enum BinanceOrderSide: String, Codable {
@@ -71,6 +90,13 @@ public enum BinanceOrderSide: String, Codable {
 public enum BinanceOrderTime: String, Codable {
     case goodTilCancelled = "GTC"
     case immediateOrCancel = "IOC"
+    case fillOrKill = "FOK"
+}
+
+public enum BinanceResponseType: String, Codable {
+    case ack = "ACK"
+    case result = "RESULT"
+    case full = "FULL"
 }
 
 public enum BinanceCandlesticksInterval: String, Codable {
@@ -91,8 +117,20 @@ public enum BinanceCandlesticksInterval: String, Codable {
     case month1 = "1M"
 }
 
+public enum BinanceRateLitmiters: String, Codable {
+    case requestWeight = "REQUEST_WEIGHT"
+    case orders = "ORDERS"
+    case rawReequests = "RAW_REQUESTS"
+}
+
+public enum BinanceRateLimitIntervals: String, Codable {
+    case second = "SECOND"
+    case minute = "MINUTE"
+    case day = "DAY"
+}
+
 public struct BinanceApi {
-    static let baseUrl = URL(string: "https://www.binance.com/api/")!
+    static let baseUrl = URL(string: "https://api.binance.com/api/")!
 
     let session: SessionManager
 
@@ -190,7 +228,7 @@ public protocol BinanceRequest: Encodable, URLConvertible, URLRequestConvertible
 
 public extension BinanceRequest {
     public func asURL() throws -> URL {
-        let baseUrl = URL(string: "https://www.binance.com/api/")!
+        let baseUrl = URL(string: "https://api.binance.com/api/")!
         return URL(string: Self.endpoint, relativeTo: baseUrl)!
     }
 

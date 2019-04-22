@@ -2,7 +2,7 @@
 
 [![Carthage compatible](https://img.shields.io/badge/Carthage-compatible-4BC51D.svg?style=flat)](https://github.com/Carthage/Carthage)
 
-This library enables access to the [Binance REST API](https://www.binance.com/restapipub.html) from an Objective-C or Swift program. It supports unsigned acess to  `v1/api` and signed access to `v3/api` . The Objective-C version returns a lightly-typed `NSDictionary` or `NSArray` of results. For optional numeric parameters you may pass `0` for omission. The Swift version creates a `Alamofire.URLConvertible request` that returns a strongly-typed `struct`.
+This library enables access to the [Binance REST API](https://github.com/binance-exchange/binance-official-api-docs/blob/master/rest-api.md) from an Objective-C or Swift program. It supports unsigned acess to  `v1/api` and signed access to `v3/api` . The Objective-C version returns a lightly-typed `NSDictionary` or `NSArray` of results. For optional numeric parameters you may pass `0` for omission. The Swift version creates a `Alamofire.URLConvertible request` that returns a strongly-typed `struct`.
 
 ## Installation
 
@@ -11,7 +11,7 @@ This library enables access to the [Binance REST API](https://www.binance.com/re
 Add the repository to your `Cartfile`:
 
 ```
-github "dpyro/BinanceApi"
+github "ParhamHatan/BinanceApi"
 ```
 
 Then update your built frameworks.
